@@ -288,11 +288,12 @@ class AI_Image_Caption_Generator {
         echo '<select name="ai_image_caption_options[openai_model]">';
         echo '<option value="gpt-5"' . selected($value, 'gpt-5', false) . '>GPT-5 (neuestes Modell)</option>';
         echo '<option value="gpt-5-mini"' . selected($value, 'gpt-5-mini', false) . '>GPT-5 Mini (schneller & günstiger)</option>';
+        echo '<option value="gpt-5-nano"' . selected($value, 'gpt-5-nano', false) . '>GPT-5 Nano (sehr günstig & schnell)</option>';
         echo '<option value="gpt-4o"' . selected($value, 'gpt-4o', false) . '>GPT-4o</option>';
         echo '<option value="gpt-4o-mini"' . selected($value, 'gpt-4o-mini', false) . '>GPT-4o Mini</option>';
         echo '<option value="gpt-4-vision-preview"' . selected($value, 'gpt-4-vision-preview', false) . '>GPT-4 Vision</option>';
         echo '</select>';
-        echo '<p class="description">GPT-5 ist das neueste und beste Modell. GPT-5 Mini ist günstiger bei ähnlicher Qualität.</p>';
+        echo '<p class="description">GPT-5 ist das beste Modell. GPT-5 Mini ist günstiger, GPT-5 Nano am günstigsten.</p>';
     }
     
     public function caption_style_callback() {
