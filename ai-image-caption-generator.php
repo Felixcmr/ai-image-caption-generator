@@ -1023,4 +1023,19 @@ register_activation_hook(__FILE__, function() {
     );
     add_option('ai_image_caption_options', $default_options);
 });
+require __DIR__ . '/inc/plugin-update-checker/plugin-update-checker.php';
+
+$updater = Puc_v4_Factory::buildUpdateChecker(
+    'https://github.com/Felixcmr/ai-image-caption-generator',
+    __FILE__,
+    'ai-image-caption-generator'
+);
+
+$updater->setBranch('main');
+
+$vcs = $updater->getVcsApi();
+if ($vcs) {
+    $vcs->enableReleaseAssets();
+}
+
 ?>
