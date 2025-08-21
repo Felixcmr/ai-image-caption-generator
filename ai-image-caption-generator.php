@@ -2,7 +2,7 @@
 /**
  * Plugin Name: AI Image Caption Generator
  * Description: Generiert Bildunterschriften und Alt-Text für Medien über KI-APIs
- * Version: 2.2.1
+ * Version: 2.3.1
  * Author: Your Name
  * Plugin URI: https://github.com/Felixcmr/ai-image-caption-generator
  * GitHub Plugin URI: https://github.com/Felixcmr/ai-image-caption-generator
