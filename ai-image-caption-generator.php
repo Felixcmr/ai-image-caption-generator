@@ -206,6 +206,56 @@ class AI_Image_Caption_Generator {
                 // Starte Verarbeitung
                 processNext();
             });
+            
+            // Debug-Button Handler
+            $(document).on('click', '.debug-alt-text-single', function() {
+                var button = $(this);
+                var attachmentId = button.data('attachment-id');
+                
+                button.prop('disabled', true).text('Debugge...');
+                
+                $.ajax({
+                    url: aiCaptionAjax.ajaxurl,
+                    type: 'POST',
+                    dataType: 'json',
+                    data: {
+                        action: 'generate_single_alt_text',
+                        attachment_id: attachmentId,
+                        debug: 'true',
+                        nonce: aiCaptionAjax.nonce
+                    },
+                    success: function(response) {
+                        if (response.success && response.data.debug_info) {
+                            var debugHtml = '<h3>Debug-Informationen für ' + response.data.debug_info.model + '</h3>';
+                            debugHtml += '<p><strong>Bild-URL:</strong> ' + response.data.debug_info.image_url + '</p>';
+                            debugHtml += '<h4>API Request:</h4>';
+                            debugHtml += '<pre style="max-height: 200px; overflow-y: scroll; font-size: 11px; background: #f5f5f5; padding: 10px;">';
+                            debugHtml += JSON.stringify(JSON.parse(response.data.debug_info.request_body), null, 2);
+                            debugHtml += '</pre>';
+                            debugHtml += '<h4>API Response Status: ' + response.data.debug_info.response_status + '</h4>';
+                            debugHtml += '<pre style="max-height: 200px; overflow-y: scroll; font-size: 11px; background: #f5f5f5; padding: 10px;">';
+                            debugHtml += response.data.debug_info.response_body;
+                            debugHtml += '</pre>';
+                            if (response.data.debug_info.cleaned_alt_text) {
+                                debugHtml += '<h4>Generierter Alt-Text:</h4>';
+                                debugHtml += '<p style="background: #e7f4e7; padding: 10px; font-weight: bold;">' + response.data.debug_info.cleaned_alt_text + '</p>';
+                            }
+                            
+                            // Zeige Debug-Info in einem Modal/Alert
+                            var debugWindow = window.open('', 'Debug', 'width=900,height=700,scrollbars=yes');
+                            debugWindow.document.write('<html><head><title>Debug Info</title><style>body{font-family:Arial,sans-serif;margin:20px;}</style></head><body>' + debugHtml + '</body></html>');
+                        } else {
+                            alert('Debug-Fehler: ' + (response.data || 'Unbekannter Fehler'));
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        alert('AJAX-Fehler: ' + error);
+                    },
+                    complete: function() {
+                        button.prop('disabled', false).text('Debug');
+                    }
+                });
+            });
         });
         </script>
         <?php
