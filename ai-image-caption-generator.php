@@ -1,6 +1,4 @@
 <?php
-
-<?php
 /**
  * Plugin Name: AI Image Caption Generator
  * Description: Generiert Bildunterschriften und Alt-Text für Medien über KI-APIs
@@ -207,12 +205,12 @@ class AI_Image_Caption_Generator {
                 processNext();
             });
             
-            // Debug-Button Handler
-            $(document).on('click', '.debug-alt-text-single', function() {
+            // Normaler Generieren-Button Handler
+            $(document).on('click', '.generate-alt-text-single', function() {
                 var button = $(this);
                 var attachmentId = button.data('attachment-id');
                 
-                button.prop('disabled', true).text('Debugge...');
+                button.prop('disabled', true).text('Generiere...');
                 
                 $.ajax({
                     url: aiCaptionAjax.ajaxurl,
@@ -221,38 +219,22 @@ class AI_Image_Caption_Generator {
                     data: {
                         action: 'generate_single_alt_text',
                         attachment_id: attachmentId,
-                        debug: 'true',
                         nonce: aiCaptionAjax.nonce
                     },
                     success: function(response) {
-                        if (response.success && response.data.debug_info) {
-                            var debugHtml = '<h3>Debug-Informationen für ' + response.data.debug_info.model + '</h3>';
-                            debugHtml += '<p><strong>Bild-URL:</strong> ' + response.data.debug_info.image_url + '</p>';
-                            debugHtml += '<h4>API Request:</h4>';
-                            debugHtml += '<pre style="max-height: 200px; overflow-y: scroll; font-size: 11px; background: #f5f5f5; padding: 10px;">';
-                            debugHtml += JSON.stringify(JSON.parse(response.data.debug_info.request_body), null, 2);
-                            debugHtml += '</pre>';
-                            debugHtml += '<h4>API Response Status: ' + response.data.debug_info.response_status + '</h4>';
-                            debugHtml += '<pre style="max-height: 200px; overflow-y: scroll; font-size: 11px; background: #f5f5f5; padding: 10px;">';
-                            debugHtml += response.data.debug_info.response_body;
-                            debugHtml += '</pre>';
-                            if (response.data.debug_info.cleaned_alt_text) {
-                                debugHtml += '<h4>Generierter Alt-Text:</h4>';
-                                debugHtml += '<p style="background: #e7f4e7; padding: 10px; font-weight: bold;">' + response.data.debug_info.cleaned_alt_text + '</p>';
-                            }
-                            
-                            // Zeige Debug-Info in einem Modal/Alert
-                            var debugWindow = window.open('', 'Debug', 'width=900,height=700,scrollbars=yes');
-                            debugWindow.document.write('<html><head><title>Debug Info</title><style>body{font-family:Arial,sans-serif;margin:20px;}</style></head><body>' + debugHtml + '</body></html>');
+                        if (response.success) {
+                            // Update der Anzeige
+                            var cell = button.closest('td');
+                            cell.html('<span style="color: green;">✓ Vorhanden</span><br><small>' + response.data.alt_text.substring(0, 50) + '...</small>');
                         } else {
-                            alert('Debug-Fehler: ' + (response.data || 'Unbekannter Fehler'));
+                            alert('Fehler: ' + response.data);
                         }
                     },
                     error: function(xhr, status, error) {
                         alert('AJAX-Fehler: ' + error);
                     },
                     complete: function() {
-                        button.prop('disabled', false).text('Debug');
+                        button.prop('disabled', false).text('Generieren');
                     }
                 });
             });
@@ -336,7 +318,7 @@ class AI_Image_Caption_Generator {
     }
     
     public function openai_model_callback() {
-        $value = isset($this->options['openai_model']) ? $this->options['openai_model'] : 'gpt-4o-mini';
+        $value = isset($this->options['openai_model']) ? $this->options['openai_model'] : 'gpt-5';
         echo '<select name="ai_image_caption_options[openai_model]">';
         echo '<option value="gpt-5"' . selected($value, 'gpt-5', false) . '>GPT-5 (neuestes Modell)</option>';
         echo '<option value="gpt-5-mini"' . selected($value, 'gpt-5-mini', false) . '>GPT-5 Mini (schneller & günstiger)</option>';
@@ -402,7 +384,6 @@ class AI_Image_Caption_Generator {
             } else {
                 echo '<span style="color: red;">✗ Fehlt</span>';
                 echo '<br><button type="button" class="button button-small generate-alt-text-single" data-attachment-id="' . $post_id . '">Generieren</button>';
-                echo '<br><button type="button" class="button button-small debug-alt-text-single" data-attachment-id="' . $post_id . '" style="margin-top: 3px;">Debug</button>';
             }
         }
     }
@@ -450,11 +431,8 @@ class AI_Image_Caption_Generator {
             wp_send_json_error('Ungültige Bild-ID');
         }
         
-        // Debug-Flag prüfen
-        $debug_mode = isset($_POST['debug']) && $_POST['debug'] === 'true';
-        
-        // Generiere nur Alt-Text
-        $result = $this->generate_alt_text_only($attachment_id, $debug_mode);
+        // Generiere nur Alt-Text (ohne Debug-Modus)
+        $result = $this->generate_alt_text_only($attachment_id);
         
         if (isset($result['error'])) {
             wp_send_json_error($result['error']);
@@ -462,17 +440,10 @@ class AI_Image_Caption_Generator {
             // Speichere den Alt-Text
             update_post_meta($attachment_id, '_wp_attachment_image_alt', $result['alt_text']);
             
-            $response_data = array(
+            wp_send_json_success(array(
                 'alt_text' => $result['alt_text'],
                 'message' => 'Alt-Text erfolgreich generiert und gespeichert'
-            );
-            
-            // Debug-Informationen hinzufügen falls aktiviert
-            if ($debug_mode && isset($result['debug_info'])) {
-                $response_data['debug_info'] = $result['debug_info'];
-            }
-            
-            wp_send_json_success($response_data);
+            ));
         }
     }
     
@@ -563,7 +534,7 @@ class AI_Image_Caption_Generator {
 
 Antworte NUR mit dem Alt-Text, ohne zusätzliche Erklärungen.';
         
-        $body = json_encode(array(
+        $api_params = array(
             'model' => $model,
             'messages' => array(
                 array(
@@ -581,13 +552,18 @@ Antworte NUR mit dem Alt-Text, ohne zusätzliche Erklärungen.';
                         )
                     )
                 )
-            ),
-            'max_tokens' => 100
-        ));
+            )
+        );
         
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('AI Caption Generator: Sende Anfrage mit Modell ' . $model . ' für Bild: ' . $image_url);
+        // GPT-5 Nano ohne Token-Limit als Test
+        if ($model === 'gpt-5-nano') {
+            // Kein max_completion_tokens = OpenAI entscheidet automatisch
+            $api_params['reasoning_effort'] = 'low'; // Weniger interne Überlegungen
+        } else {
+            $api_params['max_tokens'] = 200;
         }
+        
+        $body = json_encode($api_params);
         
         $response = wp_remote_post('https://api.openai.com/v1/chat/completions', array(
             'timeout' => 30,
@@ -605,28 +581,15 @@ Antworte NUR mit dem Alt-Text, ohne zusätzliche Erklärungen.';
         $status_code = wp_remote_retrieve_response_code($response);
         $body_content = wp_remote_retrieve_body($response);
         
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('AI Caption Generator: OpenAI Response Status: ' . $status_code);
-            error_log('AI Caption Generator: OpenAI Response Body: ' . substr($body_content, 0, 500));
-        }
-        
         if ($status_code !== 200) {
             $error_data = json_decode($body_content, true);
             $error_msg = isset($error_data['error']['message']) ? $error_data['error']['message'] : 'HTTP ' . $status_code;
-            
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('AI Caption Generator: Vollständiger API-Fehler: ' . $body_content);
-            }
-            
             return array('error' => 'OpenAI Fehler (' . $model . '): ' . $error_msg);
         }
         
         $data = json_decode($body_content, true);
         
         if (!isset($data['choices'][0]['message']['content'])) {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('AI Caption Generator: Unerwartete API-Antwort: ' . $body_content);
-            }
             return array('error' => 'Keine gültige Antwort von OpenAI erhalten');
         }
         
@@ -635,10 +598,6 @@ Antworte NUR mit dem Alt-Text, ohne zusätzliche Erklärungen.';
         
         if (empty($alt_text)) {
             return array('error' => 'Alt-Text ist leer - möglicherweise hat das Modell keine Antwort generiert');
-        }
-        
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('AI Caption Generator: Alt-Text erfolgreich generiert mit ' . $model . ': ' . $alt_text);
         }
         
         return array('alt_text' => $alt_text);
@@ -937,7 +896,7 @@ Antworte im Format:
 BILDUNTERSCHRIFT: [kurze, prägnante Bildunterschrift - maximal ' . $word_limit . ' Wörter]
 ALT-TEXT: [sachlicher Alt-Text]';
         
-        $body = json_encode(array(
+        $api_params = array(
             'model' => $model,
             'messages' => array(
                 array(
@@ -955,9 +914,19 @@ ALT-TEXT: [sachlicher Alt-Text]';
                         )
                     )
                 )
-            ),
-            'max_tokens' => 300
-        ));
+            )
+        );
+        
+        // GPT-5 Nano verwendet max_completion_tokens statt max_tokens
+        if ($model === 'gpt-5-nano') {
+            $api_params['max_completion_tokens'] = 500; // Großzügiges Limit für GPT-5 Nano
+            $api_params['reasoning_effort'] = 'low'; // Weniger interne Überlegungen
+        } else {
+            // Für andere Modelle können wir auch großzügiger sein
+            $api_params['max_tokens'] = 300;
+        }
+        
+        $body = json_encode($api_params);
         
         $response = wp_remote_post('https://api.openai.com/v1/chat/completions', array(
             'timeout' => 30,
@@ -1264,4 +1233,3 @@ add_action('plugins_loaded', function () {
         });
     }
 });
-
