@@ -1,8 +1,10 @@
 <?php
+
+<?php
 /**
  * Plugin Name: AI Image Caption Generator
  * Description: Generiert Bildunterschriften und Alt-Text für Medien über KI-APIs
- * Version: 2.4.3
+ * Version: 2.4.4
  * Author: Your Name
  * Plugin URI: https://github.com/Felixcmr/ai-image-caption-generator
  * GitHub Plugin URI: https://github.com/Felixcmr/ai-image-caption-generator
@@ -350,6 +352,7 @@ class AI_Image_Caption_Generator {
             } else {
                 echo '<span style="color: red;">✗ Fehlt</span>';
                 echo '<br><button type="button" class="button button-small generate-alt-text-single" data-attachment-id="' . $post_id . '">Generieren</button>';
+                echo '<br><button type="button" class="button button-small debug-alt-text-single" data-attachment-id="' . $post_id . '" style="margin-top: 3px;">Debug</button>';
             }
         }
     }
@@ -397,8 +400,11 @@ class AI_Image_Caption_Generator {
             wp_send_json_error('Ungültige Bild-ID');
         }
         
+        // Debug-Flag prüfen
+        $debug_mode = isset($_POST['debug']) && $_POST['debug'] === 'true';
+        
         // Generiere nur Alt-Text
-        $result = $this->generate_alt_text_only($attachment_id);
+        $result = $this->generate_alt_text_only($attachment_id, $debug_mode);
         
         if (isset($result['error'])) {
             wp_send_json_error($result['error']);
@@ -406,10 +412,17 @@ class AI_Image_Caption_Generator {
             // Speichere den Alt-Text
             update_post_meta($attachment_id, '_wp_attachment_image_alt', $result['alt_text']);
             
-            wp_send_json_success(array(
+            $response_data = array(
                 'alt_text' => $result['alt_text'],
                 'message' => 'Alt-Text erfolgreich generiert und gespeichert'
-            ));
+            );
+            
+            // Debug-Informationen hinzufügen falls aktiviert
+            if ($debug_mode && isset($result['debug_info'])) {
+                $response_data['debug_info'] = $result['debug_info'];
+            }
+            
+            wp_send_json_success($response_data);
         }
     }
     
@@ -430,7 +443,7 @@ class AI_Image_Caption_Generator {
             return array('error' => 'OpenAI API-Schlüssel fehlt');
         }
         
-        $model = isset($this->options['openai_model']) ? $this->options['openai_model'] : 'gpt-4o-mini';
+        $model = isset($this->options['openai_model']) ? $this->options['openai_model'] : 'gpt-5';
         
         // Kontext aufbauen
         $context_parts = array();
@@ -522,6 +535,10 @@ Antworte NUR mit dem Alt-Text, ohne zusätzliche Erklärungen.';
             'max_tokens' => 100
         ));
         
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('AI Caption Generator: Sende Anfrage mit Modell ' . $model . ' für Bild: ' . $image_url);
+        }
+        
         $response = wp_remote_post('https://api.openai.com/v1/chat/completions', array(
             'timeout' => 30,
             'headers' => array(
@@ -536,21 +553,43 @@ Antworte NUR mit dem Alt-Text, ohne zusätzliche Erklärungen.';
         }
         
         $status_code = wp_remote_retrieve_response_code($response);
-        if ($status_code !== 200) {
-            $body_content = wp_remote_retrieve_body($response);
-            $error_data = json_decode($body_content, true);
-            $error_msg = isset($error_data['error']['message']) ? $error_data['error']['message'] : 'HTTP ' . $status_code;
-            return array('error' => 'OpenAI Fehler: ' . $error_msg);
+        $body_content = wp_remote_retrieve_body($response);
+        
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('AI Caption Generator: OpenAI Response Status: ' . $status_code);
+            error_log('AI Caption Generator: OpenAI Response Body: ' . substr($body_content, 0, 500));
         }
         
-        $data = json_decode(wp_remote_retrieve_body($response), true);
+        if ($status_code !== 200) {
+            $error_data = json_decode($body_content, true);
+            $error_msg = isset($error_data['error']['message']) ? $error_data['error']['message'] : 'HTTP ' . $status_code;
+            
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('AI Caption Generator: Vollständiger API-Fehler: ' . $body_content);
+            }
+            
+            return array('error' => 'OpenAI Fehler (' . $model . '): ' . $error_msg);
+        }
+        
+        $data = json_decode($body_content, true);
         
         if (!isset($data['choices'][0]['message']['content'])) {
-            return array('error' => 'Keine Antwort von OpenAI erhalten');
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('AI Caption Generator: Unerwartete API-Antwort: ' . $body_content);
+            }
+            return array('error' => 'Keine gültige Antwort von OpenAI erhalten');
         }
         
         $alt_text = trim($data['choices'][0]['message']['content']);
         $alt_text = $this->clean_formatting($alt_text);
+        
+        if (empty($alt_text)) {
+            return array('error' => 'Alt-Text ist leer - möglicherweise hat das Modell keine Antwort generiert');
+        }
+        
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('AI Caption Generator: Alt-Text erfolgreich generiert mit ' . $model . ': ' . $alt_text);
+        }
         
         return array('alt_text' => $alt_text);
     }
@@ -784,7 +823,7 @@ Antworte NUR mit dem Alt-Text, ohne zusätzliche Erklärungen.';
             return array('error' => 'OpenAI API-Schlüssel fehlt in den Einstellungen');
         }
         
-        $model = isset($this->options['openai_model']) ? $this->options['openai_model'] : 'gpt-4o-mini';
+        $model = isset($this->options['openai_model']) ? $this->options['openai_model'] : 'gpt-5';
         $caption_style = isset($this->options['caption_style']) ? $this->options['caption_style'] : 'inspirierend';
         $caption_length = isset($this->options['caption_length']) ? $this->options['caption_length'] : 'kurz';
         
@@ -1035,7 +1074,7 @@ add_action('wp_ajax_test_ai_connection', function() {
             'Authorization' => 'Bearer ' . $api_key
         ),
         'body' => json_encode(array(
-            'model' => 'gpt-4o-mini',
+            'model' => 'gpt-5',
             'messages' => array(
                 array('role' => 'user', 'content' => 'Test')
             ),
@@ -1050,7 +1089,7 @@ add_action('wp_ajax_test_ai_connection', function() {
     
     $status_code = wp_remote_retrieve_response_code($response);
     if ($status_code === 200) {
-        wp_send_json_success('API funktioniert mit ' . (isset($options['openai_model']) ? $options['openai_model'] : 'gpt-4o-mini'));
+        wp_send_json_success('API funktioniert mit GPT-5');
     } else {
         wp_send_json_error('HTTP ' . $status_code);
     }
@@ -1059,7 +1098,7 @@ add_action('wp_ajax_test_ai_connection', function() {
 // Aktivierungs-Hook
 register_activation_hook(__FILE__, function() {
     $default_options = array(
-        'openai_model' => 'gpt-4o-mini',
+        'openai_model' => 'gpt-5',
         'caption_style' => 'inspirierend',
         'caption_length' => 'kurz',
         'caption_field' => 'excerpt'
