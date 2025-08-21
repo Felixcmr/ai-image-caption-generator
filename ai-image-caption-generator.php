@@ -2,7 +2,7 @@
 /**
  * Plugin Name: AI Image Caption Generator
  * Description: Generiert Bildunterschriften und Alt-Text für Medien über KI-APIs
- * Version: 2.4.0
+ * Version: 2.4.1
  * Author: Your Name
  * Plugin URI: https://github.com/Felixcmr/ai-image-caption-generator
  * GitHub Plugin URI: https://github.com/Felixcmr/ai-image-caption-generator
@@ -287,11 +287,12 @@ class AI_Image_Caption_Generator {
         $value = isset($this->options['openai_model']) ? $this->options['openai_model'] : 'gpt-4o-mini';
         echo '<select name="ai_image_caption_options[openai_model]">';
         echo '<option value="gpt-5"' . selected($value, 'gpt-5', false) . '>GPT-5 (neuestes Modell)</option>';
+        echo '<option value="gpt-5-mini"' . selected($value, 'gpt-5-mini', false) . '>GPT-5 Mini (schneller & günstiger)</option>';
         echo '<option value="gpt-4o"' . selected($value, 'gpt-4o', false) . '>GPT-4o</option>';
         echo '<option value="gpt-4o-mini"' . selected($value, 'gpt-4o-mini', false) . '>GPT-4o Mini</option>';
         echo '<option value="gpt-4-vision-preview"' . selected($value, 'gpt-4-vision-preview', false) . '>GPT-4 Vision</option>';
         echo '</select>';
-        echo '<p class="description">GPT-5 bietet die beste Qualität, GPT-4o Mini ist günstiger.</p>';
+        echo '<p class="description">GPT-5 ist das neueste und beste Modell. GPT-5 Mini ist günstiger bei ähnlicher Qualität.</p>';
     }
     
     public function caption_style_callback() {
@@ -428,7 +429,7 @@ class AI_Image_Caption_Generator {
             return array('error' => 'OpenAI API-Schlüssel fehlt');
         }
         
-        $model = isset($this->options['openai_model']) ? $this->options['openai_model'] : 'gpt-5';
+        $model = isset($this->options['openai_model']) ? $this->options['openai_model'] : 'gpt-4o-mini';
         
         // Kontext aufbauen
         $context_parts = array();
@@ -575,10 +576,16 @@ Antworte NUR mit dem Alt-Text, ohne zusätzliche Erklärungen.';
                 <li>Klicken Sie auf "KI Alt-Texte für diese Seite generieren" um alle sichtbaren Bilder zu verarbeiten</li>
             </ol>
             
-            <h2>Test</h2>
+            <h2>Tests</h2>
             <p>
                 <button id="test-connection" class="button">API-Verbindung testen</button>
                 <span id="test-result"></span>
+            </p>
+            
+            <h2>Update-Checker Debug</h2>
+            <p>
+                <button id="debug-update-checker" class="button">Update-Checker testen</button>
+                <span id="update-debug-result"></span>
             </p>
         </div>
         
@@ -601,6 +608,39 @@ Antworte NUR mit dem Alt-Text, ohne zusätzliche Erklärungen.';
                     success: function(response) {
                         if (response.success) {
                             result.html(' ✓ OK');
+                        } else {
+                            result.html(' ✗ ' + response.data);
+                        }
+                    },
+                    complete: function() {
+                        button.prop('disabled', false);
+                    }
+                });
+            });
+            
+            $('#debug-update-checker').click(function() {
+                var button = $(this);
+                var result = $('#update-debug-result');
+                
+                button.prop('disabled', true);
+                result.html(' Teste Update-Checker...');
+                
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'debug_update_checker',
+                        nonce: '<?php echo wp_create_nonce('debug_update_checker'); ?>'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            var html = '<br><strong>GitHub API Tests:</strong><ul>';
+                            for (var endpoint in response.data) {
+                                var status = response.data[endpoint].includes('OK') ? '✓' : '✗';
+                                html += '<li>' + status + ' ' + endpoint + ': ' + response.data[endpoint] + '</li>';
+                            }
+                            html += '</ul>';
+                            result.html(html);
                         } else {
                             result.html(' ✗ ' + response.data);
                         }
@@ -743,7 +783,7 @@ Antworte NUR mit dem Alt-Text, ohne zusätzliche Erklärungen.';
             return array('error' => 'OpenAI API-Schlüssel fehlt in den Einstellungen');
         }
         
-        $model = isset($this->options['openai_model']) ? $this->options['openai_model'] : 'gpt-5';
+        $model = isset($this->options['openai_model']) ? $this->options['openai_model'] : 'gpt-4o-mini';
         $caption_style = isset($this->options['caption_style']) ? $this->options['caption_style'] : 'inspirierend';
         $caption_length = isset($this->options['caption_length']) ? $this->options['caption_length'] : 'kurz';
         
@@ -994,7 +1034,7 @@ add_action('wp_ajax_test_ai_connection', function() {
             'Authorization' => 'Bearer ' . $api_key
         ),
         'body' => json_encode(array(
-            'model' => 'gpt-5',
+            'model' => 'gpt-4o-mini',
             'messages' => array(
                 array('role' => 'user', 'content' => 'Test')
             ),
@@ -1009,7 +1049,7 @@ add_action('wp_ajax_test_ai_connection', function() {
     
     $status_code = wp_remote_retrieve_response_code($response);
     if ($status_code === 200) {
-        wp_send_json_success('API funktioniert mit GPT-5');
+        wp_send_json_success('API funktioniert mit ' . (isset($options['openai_model']) ? $options['openai_model'] : 'gpt-4o-mini'));
     } else {
         wp_send_json_error('HTTP ' . $status_code);
     }
@@ -1018,12 +1058,66 @@ add_action('wp_ajax_test_ai_connection', function() {
 // Aktivierungs-Hook
 register_activation_hook(__FILE__, function() {
     $default_options = array(
-        'openai_model' => 'gpt-5',
+        'openai_model' => 'gpt-4o-mini',
         'caption_style' => 'inspirierend',
         'caption_length' => 'kurz',
         'caption_field' => 'excerpt'
     );
     add_option('ai_image_caption_options', $default_options);
+});
+
+// Debug-Funktion für Update-Checker
+add_action('wp_ajax_debug_update_checker', function() {
+    check_ajax_referer('debug_update_checker', 'nonce');
+    
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error('Keine Berechtigung');
+        return;
+    }
+    
+    $github_token = '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'; // Ersetzen Sie dies durch Ihr neues Token
+    
+    // Test verschiedene GitHub API Endpunkte
+    $endpoints = array(
+        'repo' => 'https://api.github.com/repos/Felixcmr/ai-image-caption-generator',
+        'releases' => 'https://api.github.com/repos/Felixcmr/ai-image-caption-generator/releases',
+        'tags' => 'https://api.github.com/repos/Felixcmr/ai-image-caption-generator/tags',
+        'latest_release' => 'https://api.github.com/repos/Felixcmr/ai-image-caption-generator/releases/latest'
+    );
+    
+    $results = array();
+    
+    foreach ($endpoints as $name => $url) {
+        $response = wp_remote_get($url, array(
+            'timeout' => 15,
+            'headers' => array(
+                'Authorization' => 'token ' . $github_token,
+                'User-Agent' => 'WordPress-Plugin-AI-Caption-Generator',
+                'Accept' => 'application/vnd.github.v3+json'
+            )
+        ));
+        
+        if (is_wp_error($response)) {
+            $results[$name] = 'Fehler: ' . $response->get_error_message();
+        } else {
+            $status = wp_remote_retrieve_response_code($response);
+            $body = wp_remote_retrieve_body($response);
+            
+            if ($status === 200) {
+                $data = json_decode($body, true);
+                if ($name === 'latest_release') {
+                    $results[$name] = 'OK - Version: ' . ($data['tag_name'] ?? 'Keine');
+                } else {
+                    $count = is_array($data) ? count($data) : 1;
+                    $results[$name] = 'OK - ' . $count . ' Einträge';
+                }
+            } else {
+                $results[$name] = 'HTTP ' . $status . ' - ' . substr($body, 0, 100);
+            }
+        }
+    }
+    
+    wp_send_json_success($results);
 });
 
 // --- Plugin Update Checker für privates Repository ---
@@ -1046,11 +1140,17 @@ add_action('plugins_loaded', function () {
             'ai-image-caption-generator'
         );
 
-        // WARNUNG: Dieses Token ist kompromittiert und muss sofort ersetzt werden!
-        $github_token = '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';
+        // Setzen Sie hier Ihr neues GitHub Token ein
+        $github_token = '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'; // Ersetzen Sie dies durch Ihr neues Token
         
         $updater->setAuthentication($github_token);
         $updater->setBranch('main');
+
+        // Zusätzliche Konfiguration für private Repositories
+        $updater->addQueryArgFilter(function($queryArgs) use ($github_token) {
+            $queryArgs['access_token'] = $github_token;
+            return $queryArgs;
+        });
 
         $vcs = $updater->getVcsApi();
         if ($vcs) {
@@ -1074,3 +1174,4 @@ add_action('plugins_loaded', function () {
         });
     }
 });
+
