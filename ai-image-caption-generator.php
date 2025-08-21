@@ -1123,7 +1123,7 @@ add_action('wp_ajax_debug_update_checker', function() {
 
 // --- Plugin Update Checker für privates Repository ---
 add_action('plugins_loaded', function () {
-    $path = __DIR__ . '/inc/plugin-update-checker/plugin-update-checker.php';
+    $path = __DIR__ . '/inc/plugin-update-checker-master/plugin-update-checker.php';
     if (!file_exists($path)) {
         add_action('admin_notices', function () use ($path) {
             echo '<div class="notice notice-error"><p><strong>AI Image Caption Generator:</strong> PUC nicht gefunden: '
