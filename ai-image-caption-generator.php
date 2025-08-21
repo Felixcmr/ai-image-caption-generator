@@ -1023,19 +1023,29 @@ register_activation_hook(__FILE__, function() {
     );
     add_option('ai_image_caption_options', $default_options);
 });
-require __DIR__ . '/inc/plugin-update-checker/plugin-update-checker.php';
+// --- Plugin Update Checker sicher laden ---
+add_action('plugins_loaded', function () {
+    $puc_path = __DIR__ . '/inc/plugin-update-checker/plugin-update-checker.php';
 
-$updater = Puc_v4_Factory::buildUpdateChecker(
-    'https://github.com/Felixcmr/ai-image-caption-generator',
-    __FILE__,
-    'ai-image-caption-generator'
-);
+    if (file_exists($puc_path)) {
+        require $puc_path;
 
-$updater->setBranch('main');
+        $updater = Puc_v4_Factory::buildUpdateChecker(
+            'https://github.com/Felixcmr/ai-image-caption-generator',
+            __FILE__,
+            'ai-image-caption-generator'
+        );
 
-$vcs = $updater->getVcsApi();
-if ($vcs) {
-    $vcs->enableReleaseAssets();
-}
+        $updater->setBranch('main');
 
-?>
+        $vcs = $updater->getVcsApi();
+        if ($vcs) {
+            $vcs->enableReleaseAssets();
+        }
+    } else {
+        // Zeige klare Fehlermeldung im Admin, statt fatal zu sterben
+        add_action('admin_notices', function () use ($puc_path) {
+            echo '<div class="notice notice-error"><p><strong>AI Image Caption Generator:</strong> Plugin Update Checker nicht gefunden: ' . esc_html($puc_path) . '</p></div>';
+        });
+    }
+});
