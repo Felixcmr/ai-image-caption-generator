@@ -2,7 +2,7 @@
 /**
  * Plugin Name: AI Image Caption Generator
  * Description: Generiert Bildunterschriften und Alt-Text für Medien über KI-APIs
- * Version: 2.3.1
+ * Version: 2.4.0
  * Author: Your Name
  * Plugin URI: https://github.com/Felixcmr/ai-image-caption-generator
  * GitHub Plugin URI: https://github.com/Felixcmr/ai-image-caption-generator
@@ -286,10 +286,12 @@ class AI_Image_Caption_Generator {
     public function openai_model_callback() {
         $value = isset($this->options['openai_model']) ? $this->options['openai_model'] : 'gpt-4o-mini';
         echo '<select name="ai_image_caption_options[openai_model]">';
-        echo '<option value="gpt-4.1-nano"' . selected($value, 'gpt-4.1-nano', false) . '>GPT-4.1 Nano (günstig & schnell)</option>';
+        echo '<option value="gpt-5"' . selected($value, 'gpt-5', false) . '>GPT-5 (neuestes Modell)</option>';
+        echo '<option value="gpt-4o"' . selected($value, 'gpt-4o', false) . '>GPT-4o</option>';
         echo '<option value="gpt-4o-mini"' . selected($value, 'gpt-4o-mini', false) . '>GPT-4o Mini</option>';
         echo '<option value="gpt-4-vision-preview"' . selected($value, 'gpt-4-vision-preview', false) . '>GPT-4 Vision</option>';
         echo '</select>';
+        echo '<p class="description">GPT-5 bietet die beste Qualität, GPT-4o Mini ist günstiger.</p>';
     }
     
     public function caption_style_callback() {
@@ -323,7 +325,7 @@ class AI_Image_Caption_Generator {
     
     public function enqueue_scripts($hook) {
         if (in_array($hook, array('post.php', 'post-new.php', 'upload.php', 'media_page_ai-bulk-alt-text', 'settings_page_ai-image-caption-generator'))) {
-            wp_enqueue_script('ai-caption-script', plugin_dir_url(__FILE__) . 'ai-caption.js', array('jquery'), '2.1', true);
+            wp_enqueue_script('ai-caption-script', plugin_dir_url(__FILE__) . 'ai-caption.js', array('jquery'), '2.4', true);
             wp_localize_script('ai-caption-script', 'aiCaptionAjax', array(
                 'ajaxurl' => admin_url('admin-ajax.php'),
                 'nonce' => wp_create_nonce('ai_caption_nonce'),
@@ -426,7 +428,7 @@ class AI_Image_Caption_Generator {
             return array('error' => 'OpenAI API-Schlüssel fehlt');
         }
         
-        $model = isset($this->options['openai_model']) ? $this->options['openai_model'] : 'gpt-4.1-nano';
+        $model = isset($this->options['openai_model']) ? $this->options['openai_model'] : 'gpt-5';
         
         // Kontext aufbauen
         $context_parts = array();
@@ -741,7 +743,7 @@ Antworte NUR mit dem Alt-Text, ohne zusätzliche Erklärungen.';
             return array('error' => 'OpenAI API-Schlüssel fehlt in den Einstellungen');
         }
         
-        $model = isset($this->options['openai_model']) ? $this->options['openai_model'] : 'gpt-4o-mini';
+        $model = isset($this->options['openai_model']) ? $this->options['openai_model'] : 'gpt-5';
         $caption_style = isset($this->options['caption_style']) ? $this->options['caption_style'] : 'inspirierend';
         $caption_length = isset($this->options['caption_length']) ? $this->options['caption_length'] : 'kurz';
         
@@ -992,7 +994,7 @@ add_action('wp_ajax_test_ai_connection', function() {
             'Authorization' => 'Bearer ' . $api_key
         ),
         'body' => json_encode(array(
-            'model' => 'gpt-4o-mini',
+            'model' => 'gpt-5',
             'messages' => array(
                 array('role' => 'user', 'content' => 'Test')
             ),
@@ -1007,7 +1009,7 @@ add_action('wp_ajax_test_ai_connection', function() {
     
     $status_code = wp_remote_retrieve_response_code($response);
     if ($status_code === 200) {
-        wp_send_json_success('API funktioniert');
+        wp_send_json_success('API funktioniert mit GPT-5');
     } else {
         wp_send_json_error('HTTP ' . $status_code);
     }
@@ -1016,14 +1018,15 @@ add_action('wp_ajax_test_ai_connection', function() {
 // Aktivierungs-Hook
 register_activation_hook(__FILE__, function() {
     $default_options = array(
-        'openai_model' => 'gpt-4.1-nano',
+        'openai_model' => 'gpt-5',
         'caption_style' => 'inspirierend',
         'caption_length' => 'kurz',
         'caption_field' => 'excerpt'
     );
     add_option('ai_image_caption_options', $default_options);
 });
-// --- Plugin Update Checker für v5.x laden ---
+
+// --- Plugin Update Checker für privates Repository ---
 add_action('plugins_loaded', function () {
     $path = __DIR__ . '/inc/plugin-update-checker/plugin-update-checker.php';
     if (!file_exists($path)) {
@@ -1036,17 +1039,38 @@ add_action('plugins_loaded', function () {
 
     require_once $path;
 
-    // PUC v5: Namespaced Factory verwenden
-    $updater = \YahnisElsts\PluginUpdateChecker\v5\PucFactory::buildUpdateChecker(
-        'https://github.com/Felixcmr/ai-image-caption-generator',
-        __FILE__,
-        'ai-image-caption-generator'
-    );
+    try {
+        $updater = \YahnisElsts\PluginUpdateChecker\v5p6\PucFactory::buildUpdateChecker(
+            'https://github.com/Felixcmr/ai-image-caption-generator',
+            __FILE__,
+            'ai-image-caption-generator'
+        );
 
-    $updater->setBranch('main');
+        // WARNUNG: Dieses Token ist kompromittiert und muss sofort ersetzt werden!
+        $github_token = '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';
+        
+        $updater->setAuthentication($github_token);
+        $updater->setBranch('main');
 
-    $vcs = $updater->getVcsApi();
-    if ($vcs) {
-        $vcs->enableReleaseAssets();
+        $vcs = $updater->getVcsApi();
+        if ($vcs) {
+            $vcs->enableReleaseAssets();
+        }
+
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('AI Caption Generator: PUC für privates Repository initialisiert');
+        }
+
+    } catch (Exception $e) {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('AI Caption Generator PUC Fehler: ' . $e->getMessage());
+        }
+        
+        add_action('admin_notices', function () use ($e) {
+            if (current_user_can('manage_options')) {
+                echo '<div class="notice notice-error"><p><strong>AI Image Caption Generator:</strong> Update-Checker Fehler: ' 
+                     . esc_html($e->getMessage()) . '</p></div>';
+            }
+        });
     }
 });
