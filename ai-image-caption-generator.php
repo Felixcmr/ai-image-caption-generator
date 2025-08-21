@@ -2,7 +2,7 @@
 /**
  * Plugin Name: AI Image Caption Generator
  * Description: Generiert Bildunterschriften und Alt-Text für Medien über KI-APIs
- * Version: 2.2.0
+ * Version: 2.2.1
  * Author: Your Name
  * Plugin URI: https://github.com/Felixcmr/ai-image-caption-generator
  * GitHub Plugin URI: https://github.com/Felixcmr/ai-image-caption-generator
@@ -1023,29 +1023,30 @@ register_activation_hook(__FILE__, function() {
     );
     add_option('ai_image_caption_options', $default_options);
 });
-// --- Plugin Update Checker sicher laden ---
+// --- Plugin Update Checker für v5.x laden ---
 add_action('plugins_loaded', function () {
-    $puc_path = __DIR__ . '/inc/plugin-update-checker/plugin-update-checker.php';
-
-    if (file_exists($puc_path)) {
-        require $puc_path;
-
-        $updater = Puc_v4_Factory::buildUpdateChecker(
-            'https://github.com/Felixcmr/ai-image-caption-generator',
-            __FILE__,
-            'ai-image-caption-generator'
-        );
-
-        $updater->setBranch('main');
-
-        $vcs = $updater->getVcsApi();
-        if ($vcs) {
-            $vcs->enableReleaseAssets();
-        }
-    } else {
-        // Zeige klare Fehlermeldung im Admin, statt fatal zu sterben
-        add_action('admin_notices', function () use ($puc_path) {
-            echo '<div class="notice notice-error"><p><strong>AI Image Caption Generator:</strong> Plugin Update Checker nicht gefunden: ' . esc_html($puc_path) . '</p></div>';
+    $path = __DIR__ . '/inc/plugin-update-checker/plugin-update-checker.php';
+    if (!file_exists($path)) {
+        add_action('admin_notices', function () use ($path) {
+            echo '<div class="notice notice-error"><p><strong>AI Image Caption Generator:</strong> PUC nicht gefunden: '
+                 . esc_html($path) . '</p></div>';
         });
+        return;
+    }
+
+    require_once $path;
+
+    // PUC v5: Namespaced Factory verwenden
+    $updater = \YahnisElsts\PluginUpdateChecker\v5\PucFactory::buildUpdateChecker(
+        'https://github.com/Felixcmr/ai-image-caption-generator',
+        __FILE__,
+        'ai-image-caption-generator'
+    );
+
+    $updater->setBranch('main');
+
+    $vcs = $updater->getVcsApi();
+    if ($vcs) {
+        $vcs->enableReleaseAssets();
     }
 });
