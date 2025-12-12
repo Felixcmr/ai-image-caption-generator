@@ -8,6 +8,43 @@ jQuery(document).ready(function($) {
         }
     }
     
+    // Debug-Funktion zum Finden der richtigen Selektoren
+    function debugMediaFields() {
+        log('=== Debug: Suche nach Media-Feldern ===');
+        
+        // Alt-Text Felder
+        log('Alt-Text Felder:');
+        log('  input[name="_wp_attachment_image_alt"]: ' + $('input[name="_wp_attachment_image_alt"]').length);
+        log('  #attachment_alt: ' + $('#attachment_alt').length);
+        log('  #attachment-details-alt-text: ' + $('#attachment-details-alt-text').length);
+        
+        // Caption Felder (excerpt)
+        log('Caption Felder (excerpt):');
+        log('  textarea[name="excerpt"]: ' + $('textarea[name="excerpt"]').length);
+        log('  #attachment_caption: ' + $('#attachment_caption').length);
+        log('  #attachment-details-caption: ' + $('#attachment-details-caption').length);
+        
+        // Content Felder
+        log('Content Felder:');
+        log('  textarea[name="content"]: ' + $('textarea[name="content"]').length);
+        log('  #attachment_content: ' + $('#attachment_content').length);
+        log('  #attachment-details-description: ' + $('#attachment-details-description').length);
+        
+        // Alle textarea und input Felder anzeigen
+        log('Alle Textareas auf der Seite:');
+        $('textarea').each(function(i) {
+            log('  ' + i + ': id="' + $(this).attr('id') + '" name="' + $(this).attr('name') + '"');
+        });
+        
+        log('Alle relevanten Input-Felder:');
+        $('input[type="text"]').each(function(i) {
+            var name = $(this).attr('name');
+            if (name && name.indexOf('alt') !== -1) {
+                log('  ' + i + ': id="' + $(this).attr('id') + '" name="' + name + '"');
+            }
+        });
+    }
+    
     // Event-Handler für Generieren-Button
     $(document).on('click', '.ai-generate-btn', function(e) {
         e.preventDefault();
@@ -116,6 +153,9 @@ jQuery(document).ready(function($) {
                 log('Speichern Antwort: ' + JSON.stringify(response));
                 
                 if (response.success) {
+                    // DEBUG: Zeige verfügbare Felder
+                    debugMediaFields();
+                    
                     // Aktualisiere die Anzeige
                     var fieldLabel = aiCaptionAjax.captionField === 'content' ? 'Beschreibung' : 'Bildunterschrift';
                     $('#current-caption-' + attachmentId).text(caption || 'Keine');
@@ -165,6 +205,9 @@ jQuery(document).ready(function($) {
             },
             success: function(response) {
                 if (response.success) {
+                    // DEBUG: Zeige verfügbare Felder
+                    debugMediaFields();
+                    
                     $('#current-alt-' + attachmentId).text(altText || 'Keiner');
                     
                     result.hide();
@@ -187,18 +230,64 @@ jQuery(document).ready(function($) {
         });
     }
     
-    // Helper-Funktion zum Aktualisieren der Mediathek-Felder
-    function updateMediaLibraryFields(attachmentId, caption, altText, updateBoth) {
-        if (caption !== null && aiCaptionAjax.captionField === 'excerpt' && $('#attachment-details-caption').length) {
-            $('#attachment-details-caption').val(caption);
+   // Helper-Funktion zum Aktualisieren der Mediathek-Felder
+function updateMediaLibraryFields(attachmentId, caption, altText, updateBoth) {
+    log('=== Aktualisiere Felder ===');
+    log('Caption: ' + caption);
+    log('Alt-Text: ' + altText);
+    
+    // Bild-Detailseite (Edit Media Page) - Die Haupt-Felder
+    if (altText !== null) {
+        // Alt-Text Feld
+        if ($('#attachment_alt').length) {
+            log('Aktualisiere: #attachment_alt');
+            $('#attachment_alt').val(altText).trigger('change');
         }
-        if (caption !== null && aiCaptionAjax.captionField === 'content' && $('#attachment-details-description').length) {
-            $('#attachment-details-description').val(caption);
-        }
-        if (altText !== null && $('#attachment-details-alt-text').length) {
-            $('#attachment-details-alt-text').val(altText);
+        if ($('input[name="_wp_attachment_image_alt"]').length) {
+            log('Aktualisiere: input[name="_wp_attachment_image_alt"]');
+            $('input[name="_wp_attachment_image_alt"]').val(altText).trigger('change');
         }
     }
+    
+    if (caption !== null) {
+        // Prüfe welches Feld verwendet werden soll
+        if (aiCaptionAjax.captionField === 'excerpt') {
+            // Bildunterschrift (excerpt)
+            if ($('#attachment_caption').length) {
+                log('Aktualisiere: #attachment_caption (excerpt)');
+                $('#attachment_caption').val(caption).trigger('change');
+            }
+            if ($('textarea[name="excerpt"]').length) {
+                log('Aktualisiere: textarea[name="excerpt"]');
+                $('textarea[name="excerpt"]').val(caption).trigger('change');
+            }
+        } else if (aiCaptionAjax.captionField === 'content') {
+            // Beschreibung (content)
+            if ($('#attachment_content').length) {
+                log('Aktualisiere: #attachment_content (content)');
+                $('#attachment_content').val(caption).trigger('change');
+            }
+            if ($('textarea[name="content"]').length) {
+                log('Aktualisiere: textarea[name="content"]');
+                $('textarea[name="content"]').val(caption).trigger('change');
+            }
+        }
+    }
+    
+    // Standard Mediathek-Modal (Lightbox) - für den Fall dass es im Modal verwendet wird
+    if (caption !== null && aiCaptionAjax.captionField === 'excerpt' && $('#attachment-details-caption').length) {
+        log('Aktualisiere: #attachment-details-caption (Modal)');
+        $('#attachment-details-caption').val(caption).trigger('change');
+    }
+    if (caption !== null && aiCaptionAjax.captionField === 'content' && $('#attachment-details-description').length) {
+        log('Aktualisiere: #attachment-details-description (Modal)');
+        $('#attachment-details-description').val(caption).trigger('change');
+    }
+    if (altText !== null && $('#attachment-details-alt-text').length) {
+        log('Aktualisiere: #attachment-details-alt-text (Modal)');
+        $('#attachment-details-alt-text').val(altText).trigger('change');
+    }
+}
     
     // Event-Handler für Abbrechen-Button
     $(document).on('click', '.ai-cancel-btn', function(e) {
