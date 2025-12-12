@@ -1134,7 +1134,7 @@ add_action('wp_ajax_debug_update_checker', function() {
         return;
     }
     
-    $github_token = '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'; // Ersetzen Sie dies durch Ihr neues Token
+    $github_token = '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'; // Ersetzen Sie dies durch Ihr neues Token
     
     // Test verschiedene GitHub API Endpunkte
     $endpoints = array(
