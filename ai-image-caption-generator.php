@@ -2,7 +2,7 @@
 /**
  * Plugin Name: AI Image Caption Generator
  * Description: Generiert Bildunterschriften und Alt-Text für Medien über KI-APIs
- * Version: 2.4.4
+ * Version: 2.4.6
  * Author: Your Name
  * Plugin URI: https://github.com/Felixcmr/ai-image-caption-generator
  * GitHub Plugin URI: https://github.com/Felixcmr/ai-image-caption-generator
@@ -1134,9 +1134,7 @@ add_action('wp_ajax_debug_update_checker', function() {
         return;
     }
     
-    $github_token = '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'; // Ersetzen Sie dies durch Ihr neues Token
-    
-    // Test verschiedene GitHub API Endpunkte
+    // Test verschiedene GitHub API Endpunkte (öffentliches Repo - kein Token nötig)
     $endpoints = array(
         'repo' => 'https://api.github.com/repos/Felixcmr/ai-image-caption-generator',
         'releases' => 'https://api.github.com/repos/Felixcmr/ai-image-caption-generator/releases',
@@ -1150,7 +1148,6 @@ add_action('wp_ajax_debug_update_checker', function() {
         $response = wp_remote_get($url, array(
             'timeout' => 15,
             'headers' => array(
-                'Authorization' => 'token ' . $github_token,
                 'User-Agent' => 'WordPress-Plugin-AI-Caption-Generator',
                 'Accept' => 'application/vnd.github.v3+json'
             )
@@ -1179,14 +1176,10 @@ add_action('wp_ajax_debug_update_checker', function() {
     wp_send_json_success($results);
 });
 
-// --- Plugin Update Checker für privates Repository ---
+// --- Plugin Update Checker für öffentliches Repository ---
 add_action('plugins_loaded', function () {
     $path = __DIR__ . '/inc/plugin-update-checker-master/plugin-update-checker.php';
     if (!file_exists($path)) {
-        add_action('admin_notices', function () use ($path) {
-            echo '<div class="notice notice-error"><p><strong>AI Image Caption Generator:</strong> PUC nicht gefunden: '
-                 . esc_html($path) . '</p></div>';
-        });
         return;
     }
 
@@ -1194,42 +1187,14 @@ add_action('plugins_loaded', function () {
 
     try {
         $updater = \YahnisElsts\PluginUpdateChecker\v5p6\PucFactory::buildUpdateChecker(
-            'https://github.com/Felixcmr/ai-image-caption-generator',
+            'https://github.com/Felixcmr/ai-image-caption-generator/',
             __FILE__,
             'ai-image-caption-generator'
         );
-
-        // Setzen Sie hier Ihr neues GitHub Token ein
-        $github_token = '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'; // Ersetzen Sie dies durch Ihr neues Token
         
-        $updater->setAuthentication($github_token);
         $updater->setBranch('main');
 
-        // Zusätzliche Konfiguration für private Repositories
-        $updater->addQueryArgFilter(function($queryArgs) use ($github_token) {
-            $queryArgs['access_token'] = $github_token;
-            return $queryArgs;
-        });
-
-        $vcs = $updater->getVcsApi();
-        if ($vcs) {
-            $vcs->enableReleaseAssets();
-        }
-
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('AI Caption Generator: PUC für privates Repository initialisiert');
-        }
-
     } catch (Exception $e) {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('AI Caption Generator PUC Fehler: ' . $e->getMessage());
-        }
-        
-        add_action('admin_notices', function () use ($e) {
-            if (current_user_can('manage_options')) {
-                echo '<div class="notice notice-error"><p><strong>AI Image Caption Generator:</strong> Update-Checker Fehler: ' 
-                     . esc_html($e->getMessage()) . '</p></div>';
-            }
-        });
+        error_log('AI Caption PUC Fehler: ' . $e->getMessage());
     }
 });
